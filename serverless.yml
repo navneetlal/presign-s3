@@ -1,0 +1,62 @@
+service: presigned-s3
+frameworkVersion: '3'
+
+plugins:
+  - serverless-dynamodb-local
+
+custom:
+  tableName: 'presigned-s3-applications-${sls:stage}'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  architecture: arm64
+  logRetentionInDays: 7
+  deploymentPrefix: serverless
+  deploymentBucket:
+    name: com.serverless.${self:provider.region}.deploys
+    maxPreviousDeploymentArtifacts: 5
+  logs:
+    httpApi: true
+  environment:
+    APPLICATION_TABLE: ${self:custom.tableName}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ PresignedS3Applications, Arn ]
+  
+
+functions:
+  api:
+    handler: index.handler
+    events:
+      - httpApi: '*'
+
+resources:
+  Resources:
+    PresignedS3Applications:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: app_name
+            AttributeType: S
+          - AttributeName: access_token
+            AttributeType: S
+          - AttributeName: bucket_name
+            AttributeType: S
+          - AttributeName: object_path
+            AttributeType: S
+        KeySchema:
+          - AttributeName: app_name
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:custom.tableName}
